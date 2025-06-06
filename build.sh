@@ -211,7 +211,7 @@ function _build(){
 
     build \
         -s \
-        -n 0 \
+        -n 16 \
         -a AARCH64 \
         -t "${TOOLCHAIN}" \
         -p "${ROOTDIR}/${DSC_FILE}" \
