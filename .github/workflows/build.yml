@@ -67,6 +67,7 @@ jobs:
           gettext \
           git \
           gcc-aarch64-linux-gnu \
+          gcc-arm-linux-gnueabihf \
           libc6-dev-arm64-cross \
           python3 \
           python3-pyelftools \
