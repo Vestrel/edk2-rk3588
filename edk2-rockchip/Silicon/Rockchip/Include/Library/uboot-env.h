@@ -21,7 +21,7 @@ typedef unsigned int uint;
 typedef UINTN ulong;
 typedef INTN ssize_t;
 typedef UINTN size_t;
-typedef BOOLEAN bool;
+// typedef BOOLEAN bool;
 typedef UINT16 __be16;
 
 #define true TRUE

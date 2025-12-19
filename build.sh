@@ -11,6 +11,7 @@ function _help(){
     echo "  -r, --release MODE          Release mode for building, default is 'DEBUG', 'RELEASE' alternatively."
     echo "  -t, --toolchain TOOLCHAIN   Set toolchain, default is 'GCC'."
     echo "  --open-tfa ENABLE           Use open-source TF-A submodule. Default: ${OPEN_TFA}"
+    echo "  --open-tee ENABLE           Use open-source TEE submodule. Default: ${OPEN_TEE}"
     echo "  --tfa-flags \"FLAGS\"         Flags appended to open TF-A build process."
     echo "  --edk2-flags \"FLAGS\"        Flags appended to the EDK2 build process."
     echo "  --skip-patchsets            Skip applying upstream submodule patchsets during development."
@@ -116,6 +117,10 @@ function _build_fit() {
         BL31="${ROOTDIR}/arm-trusted-firmware/build/${TFA_PLAT}/${RELEASE_TYPE,,}/bl31/bl31.elf"
     fi
 
+    if ${OPEN_TEE}; then
+        BL32="${ROOTDIR}/optee_os/out/arm-plat-rockchip/core/tee-raw.bin"
+    fi
+
     rm -f bl31_0x*.bin ${WORKSPACE}/BL33_AP_UEFI.Fv ${SOC_L}_${DEVICE}_EFI.its
 
     ${ROOTDIR}/misc/extractbl31.py ${BL31}
@@ -188,6 +193,40 @@ function _build(){
     fi
 
     #
+    # Build OP-TEE
+    #
+    if ${OPEN_TEE}; then
+        apply_patchset "${ROOTDIR}/arm-tee-patches" "${ROOTDIR}/optee_os" || exit 1
+
+        pushd optee_os
+
+        if [ ${RELEASE_TYPE} == "DEBUG" ]; then
+            DEBUG=1
+        else
+            DEBUG=0
+        fi
+
+        make \
+            PLATFORM=${TEE_PLAT} DEBUG=${DEBUG} \
+            CFG_SHOW_CONF_ON_BOOT=y \
+            CFG_CORE_TPM_EVENT_LOG=y \
+            CFG_CORE_HUK_SUBKEY_COMPAT=n \
+            CFG_WITH_SOFTWARE_PRNG=n \
+            CFG_SECURE_DATA_PATH=y \
+            CFG_CORE_DYN_PROTMEM=y \
+            CFG_PAN=y \
+            CFG_DRIVERS_CLK=y \
+            CFG_TZDRAM_START=0x8400000 \
+            CFG_SHMEM_START=0xA400000 \
+            -j \
+            CROSS_COMPILE=${CROSS_COMPILE} \
+            CROSS_COMPILE_ta_arm32=arm-linux-gnueabihf- \
+            all ${TEE_FLAGS}
+
+        popd
+    fi
+
+    #
     # Build EDK2
     #
     apply_patchset "${ROOTDIR}/edk2-patches" "${ROOTDIR}/edk2" || exit 1
@@ -243,7 +282,9 @@ DEVICE=""
 RELEASE_TYPE=DEBUG
 TOOLCHAIN=GCC
 OPEN_TFA=true
+OPEN_TEE=true
 TFA_FLAGS=""
+TEE_FLAGS=""
 EDK2_FLAGS=""
 SKIP_PATCHSETS=false
 CLEAN=false
@@ -261,7 +302,9 @@ while true; do
         -r|--release) RELEASE_TYPE="${2}"; shift 2 ;;
         -t|--toolchain) TOOLCHAIN="${2}"; shift 2 ;;
         --open-tfa) OPEN_TFA="${2}"; shift 2 ;;
+        --open-tee) OPEN_TEE="${2}"; shift 2 ;;
         --tfa-flags) TFA_FLAGS="${2}"; shift 2 ;;
+        --tee-flags) TEE_FLAGS="${2}"; shift 2 ;;
         --edk2-flags) EDK2_FLAGS="${2}"; shift 2 ;;
         --skip-patchsets) SKIP_PATCHSETS=true; shift ;;
         -C|--clean) CLEAN=true; shift ;;
