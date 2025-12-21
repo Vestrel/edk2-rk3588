@@ -121,18 +121,24 @@ function _build_fit() {
         BL32="${ROOTDIR}/optee_os/out/arm-plat-rockchip/core/tee-raw.bin"
     fi
 
-    rm -f bl31_0x*.bin ${WORKSPACE}/BL33_AP_UEFI.Fv ${SOC_L}_${DEVICE}_EFI.its
+    rm -f bl31_*.bin ${WORKSPACE}/BL33_AP_UEFI.Fv ${SOC_L}_${DEVICE}_EFI.its
 
     ${ROOTDIR}/misc/extractbl31.py ${BL31}
-    if [ ! -f bl31_0x000f0000.bin ]; then
-        # Not used but FIT expects it.
-        touch bl31_0x000f0000.bin
-    fi
+    RODATA_FILE=$(find . -maxdepth 1 -name 'bl31_rodata_0x*.bin' -print -quit)
+    RODATA_ADDR="0x${RODATA_FILE#*0x}"
+    RODATA_ADDR="${RODATA_ADDR%%.*}"
+
+    TEXT_FILE=$(find . -maxdepth 1 -name 'bl31_text_0x*.bin' -print -quit)
+    TEXT_ADDR="0x${TEXT_FILE#*0x}"
+    TEXT_ADDR="${TEXT_ADDR%%.*}"
 
     cp ${BL32} ${WORKSPACE}/bl32.bin
     cp ${ROOTDIR}/misc/${SOC_L}_spl.dtb ${WORKSPACE}/${DEVICE}.dtb
     cp ${WORKSPACE}/Build/${PLATFORM_NAME}/${RELEASE_TYPE}_${TOOLCHAIN}/FV/BL33_AP_UEFI.Fv ${WORKSPACE}/
-    cat ${ROOTDIR}/misc/uefi_${SOC_L}.its | sed "s,@DEVICE@,${DEVICE},g" > ${SOC_L}_${DEVICE}_EFI.its
+    cat ${ROOTDIR}/misc/uefi_${SOC_L}.its | \
+        sed "s,@DEVICE@,${DEVICE},g" | \
+        sed "s,@ROADDR@,${RODATA_ADDR},g" | \
+        sed "s,@TEXTADDR@,${TEXT_ADDR},g" > ${SOC_L}_${DEVICE}_EFI.its
     ${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -f ${SOC_L}_${DEVICE}_EFI.its -E ${DEVICE}_EFI.itb
 
     popd
@@ -187,7 +193,17 @@ function _build(){
             DEBUG=0
         fi
 
-        make PLAT=${TFA_PLAT} DEBUG=${DEBUG} all ${TFA_FLAGS}
+        make \
+            PLAT=${TFA_PLAT} DEBUG=${DEBUG} \
+            ARM_ARCH_MAJOR=8 \
+            ARM_ARCH_MINOR=2 \
+            CRYPTO_SUPPORT=3 \
+            CTX_INCLUDE_FPREGS=1 \
+            ENABLE_SVE_FOR_NS=0 \
+            CTX_INCLUDE_AARCH32_REGS=0 \
+            PSA_FWU_SUPPORT=1 \
+            SEPARATE_CODE_AND_RODATA=1 \
+            all ${TFA_FLAGS}
 
         popd
     fi

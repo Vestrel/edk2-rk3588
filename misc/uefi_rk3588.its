@@ -25,24 +25,24 @@
 		};
 		atf-1 {
 			description = "ARM Trusted Firmware";
-			data = /incbin/("./bl31_0x00040000.bin");
+			data = /incbin/("./bl31_text_@TEXTADDR@.bin");
 			type = "firmware";
 			arch = "arm64";
 			os = "arm-trusted-firmware";
 			compression = "none";
-			load = <0x00040000>;
+			load = <@TEXTADDR@>;
 			hash {
 				algo = "sha256";
 			};
 		};
 		atf-2 {
 			description = "ARM Trusted Firmware";
-			data = /incbin/("./bl31_0x000f0000.bin");
+			data = /incbin/("./bl31_rodata_@ROADDR@.bin");
 			type = "firmware";
 			arch = "arm64";
 			os = "arm-trusted-firmware";
 			compression = "none";
-			load = <0x000f0000>;
+			load = <@ROADDR@>;
 			hash {
 				algo = "sha256";
 			};
