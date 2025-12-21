@@ -18,7 +18,7 @@ def generate_atf_binary(bl31_file_name):
     with open(bl31_file_name, "rb") as bl31_file:
         bl31 = ELFFile(bl31_file)
         textSec = bl31.get_section_by_name(".text")
-        rodataSec = bl31.get_section_by_name(".rodata")
+        dataSec = bl31.get_section_by_name(".data")
 
         num = bl31.num_segments()
         for i in range(num):
@@ -28,8 +28,8 @@ def generate_atf_binary(bl31_file_name):
                 file_name = 'bl31_0x%08x.bin' % paddr
                 if seg.section_in_segment(textSec):
                     file_name = 'bl31_text_0x%08x.bin' % paddr
-                elif seg.section_in_segment(rodataSec):
-                    file_name = 'bl31_rodata_0x%08x.bin' % paddr
+                elif seg.section_in_segment(dataSec):
+                    file_name = 'bl31_data_0x%08x.bin' % paddr
                 with open(file_name, "wb") as atf:
                     atf.write(seg.data());
 

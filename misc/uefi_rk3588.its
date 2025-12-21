@@ -37,12 +37,12 @@
 		};
 		atf-2 {
 			description = "ARM Trusted Firmware";
-			data = /incbin/("./bl31_rodata_@ROADDR@.bin");
+			data = /incbin/("./bl31_data_@DADDR@.bin");
 			type = "firmware";
 			arch = "arm64";
 			os = "arm-trusted-firmware";
 			compression = "none";
-			load = <@ROADDR@>;
+			load = <@DADDR@>;
 			hash {
 				algo = "sha256";
 			};

@@ -124,9 +124,9 @@ function _build_fit() {
     rm -f bl31_*.bin ${WORKSPACE}/BL33_AP_UEFI.Fv ${SOC_L}_${DEVICE}_EFI.its
 
     ${ROOTDIR}/misc/extractbl31.py ${BL31}
-    RODATA_FILE=$(find . -maxdepth 1 -name 'bl31_rodata_0x*.bin' -print -quit)
-    RODATA_ADDR="0x${RODATA_FILE#*0x}"
-    RODATA_ADDR="${RODATA_ADDR%%.*}"
+    DATA_FILE=$(find . -maxdepth 1 -name 'bl31_data_0x*.bin' -print -quit)
+    DATA_ADDR="0x${DATA_FILE#*0x}"
+    DATA_ADDR="${DATA_ADDR%%.*}"
 
     TEXT_FILE=$(find . -maxdepth 1 -name 'bl31_text_0x*.bin' -print -quit)
     TEXT_ADDR="0x${TEXT_FILE#*0x}"
@@ -137,7 +137,7 @@ function _build_fit() {
     cp ${WORKSPACE}/Build/${PLATFORM_NAME}/${RELEASE_TYPE}_${TOOLCHAIN}/FV/BL33_AP_UEFI.Fv ${WORKSPACE}/
     cat ${ROOTDIR}/misc/uefi_${SOC_L}.its | \
         sed "s,@DEVICE@,${DEVICE},g" | \
-        sed "s,@ROADDR@,${RODATA_ADDR},g" | \
+        sed "s,@DADDR@,${DATA_ADDR},g" | \
         sed "s,@TEXTADDR@,${TEXT_ADDR},g" > ${SOC_L}_${DEVICE}_EFI.its
     ${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -f ${SOC_L}_${DEVICE}_EFI.its -E ${DEVICE}_EFI.itb
 
