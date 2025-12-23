@@ -88,13 +88,7 @@ function _build_idblock() {
     SPL_RKBIN=$(grep '^FlashBoot' ${ROOTDIR}/misc/rkbin/RKBOOT/${MINIALL_INI} | cut -d = -f 2-)
 
     DDRBIN="${ROOTDIR}/misc/rkbin/${DDRBIN_RKBIN}"
-
-    #
-    # SPL v1.13 has broken SD card support!
-    # Use v1.12 instead.
-    #
-    # SPL="${ROOTDIR}/misc/rkbin/${SPL_RKBIN}"
-    SPL="${ROOTDIR}/misc/rk3588_spl_v1.12.bin"
+    SPL="${ROOTDIR}/u-boot/spl/u-boot-spl.bin"
 
     # Create idblock.bin
     ${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -n rk3588 -T rksd -d ${DDRBIN}:${SPL} idblock.bin
@@ -107,37 +101,20 @@ function _build_fit() {
     echo " => Building FIT"
     pushd ${WORKSPACE}
 
-    BL31_RKBIN=$(grep '^PATH=.*_bl31_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
-    BL32_RKBIN=$(grep '^PATH=.*_bl32_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
-
-    BL31="${ROOTDIR}/misc/rkbin/${BL31_RKBIN}"
-    BL32="${ROOTDIR}/misc/rkbin/${BL32_RKBIN}"
-
-    if ${OPEN_TFA}; then
-        BL31="${ROOTDIR}/arm-trusted-firmware/build/${TFA_PLAT}/${RELEASE_TYPE,,}/bl31/bl31.elf"
-    fi
-
-    if ${OPEN_TEE}; then
-        BL32="${ROOTDIR}/optee_os/out/arm-plat-rockchip/core/tee-raw.bin"
-    fi
-
     rm -f bl31_*.bin ${WORKSPACE}/BL33_AP_UEFI.Fv ${SOC_L}_${DEVICE}_EFI.its
 
     ${ROOTDIR}/misc/extractbl31.py ${BL31}
-    DATA_FILE=$(find . -maxdepth 1 -name 'bl31_data_0x*.bin' -print -quit)
-    DATA_ADDR="0x${DATA_FILE#*0x}"
-    DATA_ADDR="${DATA_ADDR%%.*}"
 
     TEXT_FILE=$(find . -maxdepth 1 -name 'bl31_text_0x*.bin' -print -quit)
     TEXT_ADDR="0x${TEXT_FILE#*0x}"
     TEXT_ADDR="${TEXT_ADDR%%.*}"
 
     cp ${BL32} ${WORKSPACE}/bl32.bin
-    cp ${ROOTDIR}/misc/${SOC_L}_spl.dtb ${WORKSPACE}/${DEVICE}.dtb
+
+    cp ${ROOTDIR}/u-boot/spl/u-boot-spl.dtb ${WORKSPACE}/${DEVICE}.dtb
     cp ${WORKSPACE}/Build/${PLATFORM_NAME}/${RELEASE_TYPE}_${TOOLCHAIN}/FV/BL33_AP_UEFI.Fv ${WORKSPACE}/
     cat ${ROOTDIR}/misc/uefi_${SOC_L}.its | \
         sed "s,@DEVICE@,${DEVICE},g" | \
-        sed "s,@DADDR@,${DATA_ADDR},g" | \
         sed "s,@TEXTADDR@,${TEXT_ADDR},g" > ${SOC_L}_${DEVICE}_EFI.its
     ${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -f ${SOC_L}_${DEVICE}_EFI.its -E ${DEVICE}_EFI.itb
 
@@ -179,6 +156,86 @@ function _build(){
 
     rm -f "${OUTDIR}/RK35*_NOR_FLASH.img"
 
+    BL31_RKBIN=$(grep '^PATH=.*_bl31_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
+    BL32_RKBIN=$(grep '^PATH=.*_bl32_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
+
+    BL31="${ROOTDIR}/misc/rkbin/${BL31_RKBIN}"
+    BL32="${ROOTDIR}/misc/rkbin/${BL32_RKBIN}"
+
+    if ${OPEN_TFA}; then
+        BL31="${ROOTDIR}/arm-trusted-firmware/build/${TFA_PLAT}/${RELEASE_TYPE,,}/bl31/bl31.elf"
+    fi
+
+    if ${OPEN_TEE}; then
+        BL32="${ROOTDIR}/optee_os/out/arm-plat-rockchip/core/tee-raw.bin"
+    fi
+
+    #
+    # Build OP-TEE
+    #
+    if ${OPEN_TEE}; then
+        apply_patchset "${ROOTDIR}/arm-tee-patches" "${ROOTDIR}/optee_os" || exit 1
+
+        pushd optee_os
+
+        if [ ${RELEASE_TYPE} == "DEBUG" ]; then
+            DEBUG=1
+            TEE_LOG_LEVEL=4
+        else
+            DEBUG=0
+            TEE_LOG_LEVEL=1
+        fi
+
+        make -j \
+            PLATFORM=${TEE_PLAT} DEBUG=${DEBUG} \
+            CFG_CORE_RODATA_NOEXEC=y \
+            CFG_CORE_RWDATA_NOEXEC=y \
+            CFG_CORE_LARGE_PHYS_ADDR=y \
+            CFG_CORE_FFA=n \
+            CFG_MAP_EXT_DT_SECURE=y \
+            CFG_CORE_TPM_EVENT_LOG=y \
+            CFG_CORE_HUK_SUBKEY_COMPAT=n \
+            CFG_WITH_SOFTWARE_PRNG=n \
+            CFG_CRYPTO_WITH_CE=y \
+            CFG_ATTESTATION_PTA=y \
+            CFG_ATTESTATION_PTA_KEY_SIZE=4096 \
+            CFG_BOOT_SECONDARY_REQUEST=y \
+            CFG_CORE_HEAP_SIZE=262144 \
+            CFG_SECURE_DATA_PATH=y \
+            CFG_CORE_DYN_PROTMEM=y \
+            CFG_DRIVERS_GPIO=y \
+            CFG_DRIVERS_I2C=y \
+            CFG_DRIVERS_NVMEM=y \
+            CFG_DRIVERS_PINCTRL=y \
+            CFG_DRIVERS_REGULATOR=y \
+            CFG_DRIVERS_RSTCTRL=y \
+            CFG_DRIVERS_RTC=y \
+            CFG_EARLY_TA=y \
+            CFG_EARLY_TA_COMPRESS=y \
+            CFG_EMBEDDED_TS=y \
+            CFG_RTC_PTA=y \
+            CFG_HWRNG_PTA=y \
+            CFG_VERAISON_ATTESTATION_PTA=y \
+            CFG_WDT=y \
+            CFG_WDT_SM_HANDLER=y \
+            CFG_MULTI_CORE_HALTING=y \
+            CFG_NUM_THREADS=8 \
+            CFG_REE_FS_TA_BUFFERED=y \
+            CFG_REGULATOR_FIXED=y \
+            CFG_REGULATOR_GPIO=y \
+            CFG_HWRNG_QUALITY=1024 \
+            CFG_PAN=y \
+            CFG_DRIVERS_CLK=y \
+            CFG_TZDRAM_START=0x8400000 \
+            CFG_SHMEM_START=0xA400000 \
+            CFG_TEE_CORE_LOG_LEVEL=${TEE_LOG_LEVEL} \
+            CROSS_COMPILE=${CROSS_COMPILE} \
+            CROSS_COMPILE_ta_arm32=arm-linux-gnueabihf- \
+            all ${TEE_FLAGS}
+
+        popd
+    fi
+
     #
     # Build TF-A
     #
@@ -193,7 +250,7 @@ function _build(){
             DEBUG=0
         fi
 
-        make \
+        make -j \
             PLAT=${TFA_PLAT} DEBUG=${DEBUG} \
             ARM_ARCH_MAJOR=8 \
             ARM_ARCH_MINOR=2 \
@@ -203,44 +260,24 @@ function _build(){
             CTX_INCLUDE_AARCH32_REGS=0 \
             PSA_FWU_SUPPORT=1 \
             SEPARATE_CODE_AND_RODATA=1 \
-            all ${TFA_FLAGS}
+            SPD=opteed \
+            ${TFA_FLAGS} \
+            all
 
         popd
     fi
 
     #
-    # Build OP-TEE
+    # Build UBOOT SPL
     #
-    if ${OPEN_TEE}; then
-        apply_patchset "${ROOTDIR}/arm-tee-patches" "${ROOTDIR}/optee_os" || exit 1
+    apply_patchset "${ROOTDIR}/u-boot-patches" "${ROOTDIR}/u-boot" || exit 1
 
-        pushd optee_os
-
-        if [ ${RELEASE_TYPE} == "DEBUG" ]; then
-            DEBUG=1
-        else
-            DEBUG=0
-        fi
-
-        make \
-            PLATFORM=${TEE_PLAT} DEBUG=${DEBUG} \
-            CFG_SHOW_CONF_ON_BOOT=y \
-            CFG_CORE_TPM_EVENT_LOG=y \
-            CFG_CORE_HUK_SUBKEY_COMPAT=n \
-            CFG_WITH_SOFTWARE_PRNG=n \
-            CFG_SECURE_DATA_PATH=y \
-            CFG_CORE_DYN_PROTMEM=y \
-            CFG_PAN=y \
-            CFG_DRIVERS_CLK=y \
-            CFG_TZDRAM_START=0x8400000 \
-            CFG_SHMEM_START=0xA400000 \
-            -j \
-            CROSS_COMPILE=${CROSS_COMPILE} \
-            CROSS_COMPILE_ta_arm32=arm-linux-gnueabihf- \
-            all ${TEE_FLAGS}
-
-        popd
-    fi
+    pushd u-boot
+    export BL31=${BL31}
+    export ROCKCHIP_TPL=${DDRBIN}
+    make orangepi_5_ultra_defconfig
+    make CROSS_COMPILE=${CROSS_COMPILE} -j
+    popd
 
     #
     # Build EDK2
@@ -310,7 +347,7 @@ OUTDIR="${PWD}"
 #
 # Get options
 #
-OPTS=$(getopt -o "d:r:t:CDh" -l "device:,release:,toolchain:,open-tfa:,tfa-flags:,edk2-flags:,skip-patchsets,clean,distclean,help" -n build.sh -- "${@}") || _help $?
+OPTS=$(getopt -o "d:r:t:CDh" -l "device:,release:,toolchain:,open-tfa:,tfa-flags:,tee-flags:,edk2-flags:,skip-patchsets,clean,distclean,help" -n build.sh -- "${@}") || _help $?
 eval set -- "${OPTS}"
 while true; do
     case "${1}" in

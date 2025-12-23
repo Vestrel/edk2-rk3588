@@ -18,4 +18,7 @@
 	url = https://github.com/tianocore/edk2-platforms.git
 [submodule "optee_os"]
 	path = optee_os
-	url = https://github.com/OP-TEE/optee_os
+	url = https://github.com/vestrel/optee_os/
+[submodule "u-boot"]
+	path = u-boot
+	url = https://github.com/vestrel/u-boot/

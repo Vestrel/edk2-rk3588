@@ -10,7 +10,9 @@ typedef UINT32 u32;
 typedef UINT64 u64;
 typedef unsigned int uint;
 typedef UINTN ulong;
-// typedef BOOLEAN bool;
+#if !defined(__bool_true_false_are_defined) && __STDC_VERSION__ < 202311L
+typedef BOOLEAN bool;
+#endif
 
 #define true TRUE
 #define false FALSE

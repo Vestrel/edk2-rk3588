@@ -16,7 +16,7 @@
 			data = /incbin/("./BL33_AP_UEFI.Fv");
 			type = "standalone";
 			arch = "arm64";
-			os = "EDK2";
+			os = "u-boot";
 			compression = "none";
 			load = <0x00200000>;
 			hash {
@@ -36,20 +36,8 @@
 			};
 		};
 		atf-2 {
-			description = "ARM Trusted Firmware";
-			data = /incbin/("./bl31_data_@DADDR@.bin");
-			type = "firmware";
-			arch = "arm64";
-			os = "arm-trusted-firmware";
-			compression = "none";
-			load = <@DADDR@>;
-			hash {
-				algo = "sha256";
-			};
-		};
-		atf-3 {
-			description = "ARM Trusted Firmware";
-			data = /incbin/("./bl31_0xff100000.bin");
+			description = "ARM Trusted Firmware (PMU)";
+			data = /incbin/("./bl31_pmu.bin");
 			type = "firmware";
 			arch = "arm64";
 			os = "arm-trusted-firmware";
@@ -59,10 +47,10 @@
 				algo = "sha256";
 			};
 		};
-		optee {
+		op-tee {
 			description = "OP-TEE";
 			data = /incbin/("./bl32.bin");
-			type = "firmware";
+			type = "tee";
 			arch = "arm64";
 			os = "op-tee";
 			compression = "none";
@@ -98,7 +86,7 @@
 			description = "@DEVICE@";
 			rollback-index = <0x0>;
 			firmware = "atf-1";
-			loadables = "edk2", "atf-2", "atf-3", "optee", "nvdata";
+			loadables = "edk2", "atf-2", "op-tee", "nvdata";
 			fdt = "fdt";
 			signature {
 				algo = "sha256,rsa2048";
